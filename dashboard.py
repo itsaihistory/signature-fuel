@@ -12,6 +12,7 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
+import requests
 import yfinance as yf
 
 # Add project root to path
@@ -228,6 +229,75 @@ def load_live_prices():
     return results
 
 
+@st.cache_data(ttl=600)  # 10-minute cache
+def load_weather_alerts():
+    """Fetch active weather alerts for all states where FBOs are located."""
+    fbos = load_fbo_data()
+    if not fbos:
+        return [], []
+
+    states = sorted(set(f["state"] for f in fbos))
+    headers = {"User-Agent": "(SignatureEnergy Dashboard, contact@example.com)"}
+
+    all_alerts = []
+    for state in states:
+        try:
+            resp = requests.get(
+                f"https://api.weather.gov/alerts/active/area/{state}",
+                headers=headers,
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                features = resp.json().get("features", [])
+                for f in features:
+                    props = f.get("properties", {})
+                    all_alerts.append({
+                        "state": state,
+                        "event": props.get("event", "Unknown"),
+                        "severity": props.get("severity", "Unknown"),
+                        "urgency": props.get("urgency", "Unknown"),
+                        "certainty": props.get("certainty", "Unknown"),
+                        "headline": props.get("headline", ""),
+                        "description": props.get("description", ""),
+                        "onset": props.get("effective", ""),
+                        "expires": props.get("expires", ""),
+                        "sender": props.get("senderName", ""),
+                        "areas": props.get("areaDesc", ""),
+                    })
+        except Exception:
+            pass
+
+    # Match alerts to FBOs by checking if FBO city/state appears in alert area
+    affected = []
+    for fbo in fbos:
+        fbo_city = fbo["city"].lower()
+        fbo_state = fbo["state"]
+        for alert in all_alerts:
+            if alert["state"] != fbo_state:
+                continue
+            areas_lower = alert["areas"].lower()
+            # Check if city name or a reasonable substring appears in affected areas
+            if fbo_city in areas_lower or any(
+                word in areas_lower
+                for word in fbo_city.split()
+                if len(word) > 3
+            ):
+                affected.append({
+                    "fbo_code": fbo["code"],
+                    "city": fbo["city"],
+                    "state": fbo["state"],
+                    "event": alert["event"],
+                    "severity": alert["severity"],
+                    "urgency": alert["urgency"],
+                    "headline": alert["headline"],
+                    "onset": alert["onset"],
+                    "expires": alert["expires"],
+                    "areas": alert["areas"],
+                })
+
+    return all_alerts, affected
+
+
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 
 st.sidebar.image("assets/Signature_Aviation_new_logo.jpg", width=180)
@@ -237,7 +307,7 @@ st.sidebar.caption("Fuel Pricing Intelligence")
 page = st.sidebar.radio(
     "Navigate",
     ["Daily Recommendations", "Market Overview", "Market News",
-     "Inventory & Supply", "FBO & Pipeline Map"],
+     "Inventory & Supply", "Weather Alerts", "FBO & Pipeline Map"],
     label_visibility="collapsed",
 )
 
@@ -1062,6 +1132,151 @@ def page_fbo_map():
     )
 
 
+# ── Page: Weather Alerts ───────────────────────────────────────────────────
+
+def page_weather():
+    st.title("Weather Alerts")
+    st.caption("Active NWS alerts affecting FBO locations — updated every 10 minutes")
+
+    all_alerts, affected = load_weather_alerts()
+
+    if not all_alerts and not affected:
+        st.info("No active weather alerts for FBO states, or unable to reach weather.gov.")
+        return
+
+    # ── Summary metrics ──────────────────────────────────
+    severity_order = {"Extreme": 0, "Severe": 1, "Moderate": 2, "Minor": 3, "Unknown": 4}
+    severity_colors = {
+        "Extreme": "#7f1d1d",
+        "Severe": "#dc2626",
+        "Moderate": "#ca8a04",
+        "Minor": "#3b82f6",
+        "Unknown": "#6b7280",
+    }
+
+    # Deduplicate affected FBOs (an FBO may match multiple alerts)
+    unique_affected_fbos = set(a["fbo_code"] for a in affected)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Active Alerts", len(all_alerts))
+    col2.metric("FBOs Under Alerts", len(unique_affected_fbos))
+
+    extreme_count = sum(1 for a in all_alerts if a["severity"] == "Extreme")
+    severe_count = sum(1 for a in all_alerts if a["severity"] == "Severe")
+    col3.metric("Extreme Alerts", extreme_count)
+    col4.metric("Severe Alerts", severe_count)
+
+    st.markdown("---")
+
+    # ── Affected FBOs table ──────────────────────────────
+    if affected:
+        st.markdown("### FBOs Under Active Weather Alerts")
+
+        # Sort by severity
+        affected_sorted = sorted(affected, key=lambda a: severity_order.get(a["severity"], 99))
+
+        rows = []
+        for a in affected_sorted:
+            # Parse onset/expires for display
+            onset_str = ""
+            expires_str = ""
+            if a["onset"]:
+                try:
+                    onset_dt = datetime.fromisoformat(a["onset"].replace("Z", "+00:00"))
+                    onset_str = onset_dt.strftime("%b %d %I:%M %p")
+                except Exception:
+                    onset_str = a["onset"][:16]
+            if a["expires"]:
+                try:
+                    expires_dt = datetime.fromisoformat(a["expires"].replace("Z", "+00:00"))
+                    expires_str = expires_dt.strftime("%b %d %I:%M %p")
+                except Exception:
+                    expires_str = a["expires"][:16]
+
+            rows.append({
+                "FBO": a["fbo_code"],
+                "City": a["city"],
+                "State": a["state"],
+                "Alert": a["event"],
+                "Severity": a["severity"],
+                "Urgency": a["urgency"],
+                "Starts": onset_str,
+                "Expires": expires_str,
+            })
+
+        df_alerts = pd.DataFrame(rows)
+        st.dataframe(
+            df_alerts,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "FBO": st.column_config.TextColumn(width="small"),
+                "State": st.column_config.TextColumn(width="small"),
+                "Severity": st.column_config.TextColumn(width="small"),
+                "Urgency": st.column_config.TextColumn(width="small"),
+            },
+        )
+
+        # Show detailed alert cards for severe/extreme
+        critical = [a for a in affected_sorted if a["severity"] in ("Extreme", "Severe")]
+        if critical:
+            st.markdown("### Critical Alert Details")
+            for a in critical:
+                color = severity_colors.get(a["severity"], "#6b7280")
+                st.markdown(
+                    f"<div style='background:#f8fafc;border-left:4px solid {color};"
+                    f"padding:1rem 1.25rem;border-radius:8px;margin:0.75rem 0'>"
+                    f"<strong style='color:{color}'>{a['severity'].upper()}</strong> — "
+                    f"<strong>{a['event']}</strong> "
+                    f"({a['fbo_code']} — {a['city']}, {a['state']})<br>"
+                    f"<span style='color:#475569'>{a['headline']}</span></div>",
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.success("No active weather alerts are currently affecting any FBO locations.")
+
+    st.markdown("---")
+
+    # ── All alerts by state (collapsible) ────────────────
+    st.markdown("### All Active Alerts by State")
+    st.caption(
+        f"{len(all_alerts)} active alerts across FBO states. "
+        "Expand a state to see details."
+    )
+
+    # Group by state
+    alerts_by_state = {}
+    for a in all_alerts:
+        alerts_by_state.setdefault(a["state"], []).append(a)
+
+    for state in sorted(alerts_by_state.keys()):
+        state_alerts = sorted(
+            alerts_by_state[state],
+            key=lambda a: severity_order.get(a["severity"], 99),
+        )
+        with st.expander(f"{state} — {len(state_alerts)} alert(s)"):
+            for a in state_alerts:
+                color = severity_colors.get(a["severity"], "#6b7280")
+                expires_str = ""
+                if a["expires"]:
+                    try:
+                        expires_dt = datetime.fromisoformat(
+                            a["expires"].replace("Z", "+00:00")
+                        )
+                        expires_str = f" · Expires {expires_dt.strftime('%b %d %I:%M %p')}"
+                    except Exception:
+                        expires_str = ""
+                st.markdown(
+                    f"<div style='border-left:3px solid {color};padding:0.5rem 1rem;"
+                    f"margin:0.4rem 0;border-radius:4px'>"
+                    f"<strong style='color:{color}'>{a['severity']}</strong> — "
+                    f"{a['event']}{expires_str}<br>"
+                    f"<span style='color:#64748b;font-size:0.85rem'>{a['areas'][:200]}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+
 # ── Page: Market News ──────────────────────────────────────────────────────
 
 def page_news():
@@ -1117,5 +1332,7 @@ elif page == "Market News":
     page_news()
 elif page == "Inventory & Supply":
     page_inventory()
+elif page == "Weather Alerts":
+    page_weather()
 elif page == "FBO & Pipeline Map":
     page_fbo_map()
