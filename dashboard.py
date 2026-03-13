@@ -526,15 +526,53 @@ def page_market():
         col_t1.metric("5-Day MA", f"${ma5:.4f}")
         col_t2.metric("20-Day MA", f"${ma20:.4f}")
 
+        spread_pct = ((ma5 - ma20) / ma20) * 100
+
         if ma5 > ma20 * 1.005:
             col_t3.metric("Signal", "BULLISH")
-            st.info("5-day above 20-day — prices trending up. Prior Week Avg contracts likely cheaper.")
+            st.markdown(
+                f"<div style='background:#eff6ff;border-left:4px solid #3b82f6;"
+                f"padding:1rem 1.25rem;border-radius:8px;margin:0.75rem 0'>"
+                f"<strong>Why BULLISH?</strong><br>"
+                f"The 5-day average (<strong>${ma5:.4f}</strong>) is "
+                f"<strong>{spread_pct:.1f}%</strong> above the 20-day average "
+                f"(<strong>${ma20:.4f}</strong>). This means recent prices are higher "
+                f"than the longer-term trend — the market is moving up.<br><br>"
+                f"<strong>What it means for contracts:</strong> In a rising market, "
+                f"Contract A (Prior Week Average) is typically cheaper because the "
+                f"5-day average includes older, lower prices. Contract B (Prior Day) "
+                f"reflects yesterday's higher price.</div>",
+                unsafe_allow_html=True,
+            )
         elif ma5 < ma20 * 0.995:
             col_t3.metric("Signal", "BEARISH")
-            st.info("5-day below 20-day — prices trending down. Prior Day contracts likely cheaper.")
+            st.markdown(
+                f"<div style='background:#fef2f2;border-left:4px solid #dc2626;"
+                f"padding:1rem 1.25rem;border-radius:8px;margin:0.75rem 0'>"
+                f"<strong>Why BEARISH?</strong><br>"
+                f"The 5-day average (<strong>${ma5:.4f}</strong>) is "
+                f"<strong>{abs(spread_pct):.1f}%</strong> below the 20-day average "
+                f"(<strong>${ma20:.4f}</strong>). This means recent prices are lower "
+                f"than the longer-term trend — the market is moving down.<br><br>"
+                f"<strong>What it means for contracts:</strong> In a falling market, "
+                f"Contract B (Prior Day) is typically cheaper because yesterday's price "
+                f"is already lower than the 5-day average, which still includes older, "
+                f"higher prices.</div>",
+                unsafe_allow_html=True,
+            )
         else:
             col_t3.metric("Signal", "NEUTRAL")
-            st.info("Moving averages converging — minimal spread between contracts.")
+            st.markdown(
+                f"<div style='background:#f8fafc;border-left:4px solid #6b7280;"
+                f"padding:1rem 1.25rem;border-radius:8px;margin:0.75rem 0'>"
+                f"<strong>Why NEUTRAL?</strong><br>"
+                f"The 5-day average (<strong>${ma5:.4f}</strong>) and 20-day average "
+                f"(<strong>${ma20:.4f}</strong>) are within 0.5% of each other "
+                f"(spread: {spread_pct:+.1f}%). No clear direction.<br><br>"
+                f"<strong>What it means for contracts:</strong> The difference between "
+                f"Contract A and Contract B is minimal. Either choice is reasonable.</div>",
+                unsafe_allow_html=True,
+            )
 
     # Volatility
     if len(prices) >= 21:
