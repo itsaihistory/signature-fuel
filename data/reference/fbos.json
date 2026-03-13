@@ -1272,18 +1272,6 @@
     "region_label": "West Coast LA basis"
   },
   {
-    "code": "SDL3",
-    "city": "Scottsdale",
-    "state": "AZ",
-    "latitude": 33.6228,
-    "longitude": -111.91,
-    "padd": 5,
-    "index_publisher": "Platts",
-    "index_name": "West Coast Los Angeles Jet Fuel Prior Day",
-    "sample_differential": -0.03,
-    "region_label": "West Coast LA basis"
-  },
-  {
     "code": "SEA",
     "city": "Seattle",
     "state": "WA",
