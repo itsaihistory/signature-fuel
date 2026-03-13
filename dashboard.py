@@ -390,43 +390,96 @@ def page_market():
 
     st.markdown("---")
 
-    # Crack spread — use live WTI if available, fall back to EIA
+    # Refining Margin (formerly "Crack Spread")
     live_wti = live.get("CL=F", {}).get("price") if live else None
     live_ho = live.get("HO=F", {}).get("price") if live else None
 
     if (live_wti and live_ho) or (wti and gc):
-        st.markdown("### Crack Spread")
+        st.markdown("### Crude-to-Jet Fuel Markup")
+        st.caption(
+            "How much more jet fuel costs than the crude oil it's made from. "
+            "A higher markup means refiners are charging more — typically due to "
+            "tight supply or strong demand. Normal range: $15–25/bbl."
+        )
+
         if live_wti and live_ho:
-            # Live crack: heating oil futures vs WTI (closest jet proxy)
             wti_gal_live = live_wti / 42
             crack_live = live_ho - wti_gal_live
             crack_bbl_live = crack_live * 42
-            col_a, col_b = st.columns(2)
-            col_a.metric(
-                "Live Crack Spread (HO vs WTI)",
-                f"${crack_live:.4f}/gal",
-                help="Heating oil futures minus WTI per gallon (live proxy for jet crack)",
-            )
-            col_b.metric("Live Crack Spread", f"${crack_bbl_live:.2f}/bbl")
+
+            # Show the math
+            col_1, col_2, col_3 = st.columns(3)
+            col_1.metric("Jet Fuel (proxy)", f"${live_ho:.4f}/gal")
+            col_2.metric("Crude Oil (WTI)", f"${wti_gal_live:.4f}/gal")
+            col_3.metric("Refining Markup", f"${crack_live:.4f}/gal")
+
+            # Plain-English interpretation
             if crack_bbl_live > 35:
-                st.warning("Wide crack spread — refined products priced well above crude. Tight supply or strong demand.")
+                level = "HIGH"
+                color = "#dc2626"
+                explanation = (
+                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is well above "
+                    f"the normal $15–25 range. Jet fuel is expensive relative to crude right now. "
+                    f"This usually means supply is tight (refinery outages, maintenance) or "
+                    f"demand is unusually strong (peak travel season)."
+                )
+            elif crack_bbl_live > 25:
+                level = "ELEVATED"
+                color = "#ca8a04"
+                explanation = (
+                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is slightly above normal. "
+                    f"Jet fuel prices have a moderate premium over crude."
+                )
             elif crack_bbl_live < 15:
-                st.success("Narrow crack spread — refined products relatively cheap vs crude.")
+                level = "LOW"
+                color = "#16a34a"
+                explanation = (
+                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is below normal. "
+                    f"Jet fuel is relatively cheap compared to crude — oversupply or weak demand."
+                )
+            else:
+                level = "NORMAL"
+                color = "#3b82f6"
+                explanation = (
+                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is within the "
+                    f"normal $15–25 range. No unusual pricing pressure."
+                )
+
+            st.markdown(
+                f"<div style='background:#f8fafc;border-left:4px solid {color};"
+                f"padding:1rem 1.25rem;border-radius:8px;margin:0.75rem 0'>"
+                f"<strong style='color:{color}'>{level}</strong> — "
+                f"${crack_bbl_live:.0f}/bbl &nbsp;|&nbsp; Normal range: $15–25/bbl<br>"
+                f"<span style='color:#475569'>{explanation}</span></div>",
+                unsafe_allow_html=True,
+            )
+
         elif wti and gc:
             wti_gal = wti[-1]["value"] / 42
             crack = current - wti_gal
             crack_bbl = crack * 42
-            col_a, col_b = st.columns(2)
-            col_a.metric(
-                "Crack Spread (EIA)",
-                f"${crack:.4f}/gal",
-                help="Jet fuel price minus crude input cost per gallon",
-            )
-            col_b.metric("Crack Spread (EIA)", f"${crack_bbl:.2f}/bbl")
+
+            col_1, col_2, col_3 = st.columns(3)
+            col_1.metric("Jet Fuel Spot", f"${current:.4f}/gal")
+            col_2.metric("Crude Oil (WTI)", f"${wti_gal:.4f}/gal")
+            col_3.metric("Refining Markup", f"${crack:.4f}/gal")
+
             if crack_bbl > 35:
-                st.warning("Wide crack spread — jet fuel priced well above crude. Tight supply or strong demand.")
+                level, color = "HIGH", "#dc2626"
+            elif crack_bbl > 25:
+                level, color = "ELEVATED", "#ca8a04"
             elif crack_bbl < 15:
-                st.success("Narrow crack spread — jet fuel relatively cheap vs crude.")
+                level, color = "LOW", "#16a34a"
+            else:
+                level, color = "NORMAL", "#3b82f6"
+
+            st.markdown(
+                f"<div style='background:#f8fafc;border-left:4px solid {color};"
+                f"padding:1rem 1.25rem;border-radius:8px;margin:0.75rem 0'>"
+                f"<strong style='color:{color}'>{level}</strong> — "
+                f"${crack_bbl:.0f}/bbl &nbsp;|&nbsp; Normal range: $15–25/bbl</div>",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("---")
 
