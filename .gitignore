@@ -2,7 +2,6 @@ __pycache__/
 *.pyc
 .env
 data/cache/
-data/reference/fbos.json
 outputs/
 *.xlsx
 *.xls
