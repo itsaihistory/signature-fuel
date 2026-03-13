@@ -896,25 +896,33 @@ PIPELINE_ROUTES = {
     },
     "Explorer Pipeline": {
         "color": [37, 99, 235, 180],  # blue
-        "description": "Houston TX to Hammond IN (Chicago area) — Gulf Coast to Midwest.",
+        "description": "Houston TX to Hammond IN (Chicago area) — Gulf Coast to Midwest via DFW, Tulsa, St. Louis.",
         "capacity": "~660,000 bbl/day",
         "products": "Gasoline, diesel, jet fuel",
         "path": [
+            [-95.28, 29.69],   # Pasadena TX (Houston area)
             [-95.36, 29.76],   # Houston TX
-            [-94.10, 30.08],   # Beaumont TX
-            [-93.22, 30.23],   # Lake Charles LA
-            [-92.02, 30.22],   # Lafayette LA
-            [-91.19, 30.45],   # Baton Rouge LA
-            [-91.15, 31.31],   # Natchez MS
-            [-90.18, 32.30],   # Jackson MS area
-            [-89.53, 34.37],   # Holly Springs MS
-            [-89.97, 35.15],   # Memphis TN
-            [-88.75, 35.61],   # Jackson TN
-            [-87.99, 36.17],   # Nashville area
-            [-87.50, 36.97],   # Bowling Green KY
-            [-86.76, 37.77],   # Elizabethtown KY
-            [-85.76, 38.25],   # Louisville KY
-            [-86.16, 39.77],   # Indianapolis IN
+            [-95.55, 30.02],   # NW Houston area
+            [-96.08, 30.63],   # Bryan TX area
+            [-96.84, 31.53],   # Waco TX area
+            [-97.06, 32.43],   # Arlington TX
+            [-97.08, 32.77],   # Irving TX
+            [-97.08, 32.93],   # Grapevine / DFW area
+            [-97.02, 33.43],   # Gainesville TX area
+            [-96.85, 33.96],   # Durant OK area
+            [-96.00, 35.47],   # Tulsa OK (Corporate HQ)
+            [-95.39, 36.37],   # NE Oklahoma
+            [-94.83, 37.09],   # SE Kansas
+            [-93.29, 37.84],   # Springfield MO area
+            [-92.22, 38.58],   # Jefferson City MO area
+            [-91.19, 38.63],   # Mount Vernon MO area
+            [-90.41, 38.76],   # Woodriver / St. Louis area
+            [-90.08, 38.80],   # Saint Peters MO area
+            [-89.65, 39.10],   # SW Illinois
+            [-89.07, 39.78],   # Springfield IL area
+            [-88.30, 40.48],   # Champaign IL area
+            [-87.63, 41.17],   # Kankakee IL area
+            [-87.50, 41.44],   # Griffith IN
             [-87.33, 41.48],   # Hammond IN (Chicago area)
         ],
     },
