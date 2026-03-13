@@ -645,7 +645,8 @@ def page_inventory():
         for row in inv_rows:
             if row["Week/Week Change"] is not None and row["Week/Week Change"] < -500:
                 st.warning(
-                    f"Significant inventory draw at **{row['Region']}**: "
+                    f"Significant inventory draw at **{row['Region']}** "
+                    f"(week of {row['As Of']}): "
                     f"{row['Week/Week Change']:+,.0f} thousand barrels"
                 )
     else:
