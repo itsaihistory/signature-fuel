@@ -847,6 +847,50 @@ PIPELINE_ROUTES = {
             [-87.33, 41.48],   # Hammond IN (Chicago area)
         ],
     },
+    "CALNEV Pipeline (Kinder Morgan)": {
+        "color": [168, 85, 247, 180],  # purple
+        "description": "Colton CA to Las Vegas NV — 566 mi, transports gasoline, diesel, and jet fuel via parallel 14\" and 8\" lines.",
+        "capacity": "~120,000 bbl/day",
+        "products": "Gasoline, diesel, jet fuel",
+        "path": [
+            [-117.31, 34.05],  # Colton CA
+            [-117.02, 34.54],  # Victorville CA area
+            [-116.97, 34.84],  # Barstow CA
+            [-116.17, 35.26],  # Baker CA
+            [-115.51, 35.60],  # Primm NV
+            [-115.17, 36.08],  # Jean NV
+            [-115.14, 36.17],  # Las Vegas NV
+        ],
+    },
+    "SFPP — San Diego Line (Kinder Morgan)": {
+        "color": [245, 158, 11, 180],  # amber/orange
+        "description": "LA Basin (Carson) to San Diego — 135-mi southern segment of the SFPP system, the largest products pipeline in the Western U.S.",
+        "capacity": "~400,000 bbl/day (combined SFPP system)",
+        "products": "Gasoline, diesel, jet fuel",
+        "path": [
+            [-118.26, 33.83],  # Carson / LA Harbor area
+            [-117.88, 33.77],  # Long Beach area
+            [-117.56, 33.63],  # Orange County
+            [-117.35, 33.19],  # Oceanside / Camp Pendleton
+            [-117.16, 32.72],  # San Diego (Mission Valley)
+        ],
+    },
+    "SFPP — East Line (Kinder Morgan)": {
+        "color": [245, 158, 11, 180],  # amber/orange (same color — same system)
+        "description": "LA Basin to Phoenix and Tucson AZ — ~400-mi eastern segment originating in El Paso TX corridor.",
+        "capacity": "~400,000 bbl/day (combined SFPP system)",
+        "products": "Gasoline, diesel, jet fuel",
+        "path": [
+            [-118.26, 33.83],  # Carson / LA Harbor area
+            [-117.88, 33.77],  # Long Beach area
+            [-117.31, 34.05],  # Colton CA (junction)
+            [-115.51, 32.74],  # Imperial CA / El Centro area
+            [-114.62, 32.72],  # Yuma AZ
+            [-112.07, 33.45],  # Phoenix AZ
+            [-111.97, 33.42],  # Mesa / Tempe AZ
+            [-110.97, 32.22],  # Tucson AZ
+        ],
+    },
 }
 
 
@@ -937,8 +981,8 @@ def page_fbo_map():
     # View state — center on continental U.S.
     view = pdk.ViewState(
         latitude=36.5,
-        longitude=-86.0,
-        zoom=4.2,
+        longitude=-96.0,
+        zoom=3.8,
         pitch=0,
     )
 
