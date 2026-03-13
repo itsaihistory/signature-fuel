@@ -432,30 +432,31 @@ def page_market():
                 level = "HIGH"
                 color = "#dc2626"
                 explanation = (
-                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is well above "
-                    f"the normal $15–25 range. Jet fuel is expensive relative to crude right now. "
-                    f"This usually means supply is tight (refinery outages, maintenance) or "
-                    f"demand is unusually strong (peak travel season)."
+                    f"At <strong>${crack_bbl_live:.0f}/bbl</strong>, the refining markup is well above "
+                    f"the normal $15–25 range. This means refiners are adding a large premium on top of "
+                    f"crude oil — regardless of whether crude itself is high or low. "
+                    f"Common causes: tight refining capacity (outages, maintenance) or "
+                    f"unusually strong jet fuel demand (peak travel season)."
                 )
             elif crack_bbl_live > 25:
                 level = "ELEVATED"
                 color = "#ca8a04"
                 explanation = (
-                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is slightly above normal. "
+                    f"At <strong>${crack_bbl_live:.0f}/bbl</strong>, the refining markup is slightly above normal. "
                     f"Jet fuel prices have a moderate premium over crude."
                 )
             elif crack_bbl_live < 15:
                 level = "LOW"
                 color = "#16a34a"
                 explanation = (
-                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is below normal. "
+                    f"At <strong>${crack_bbl_live:.0f}/bbl</strong>, the refining markup is below normal. "
                     f"Jet fuel is relatively cheap compared to crude — oversupply or weak demand."
                 )
             else:
                 level = "NORMAL"
                 color = "#3b82f6"
                 explanation = (
-                    f"At **${crack_bbl_live:.0f}/bbl**, the refining markup is within the "
+                    f"At <strong>${crack_bbl_live:.0f}/bbl</strong>, the refining markup is within the "
                     f"normal $15–25 range. No unusual pricing pressure."
                 )
 
