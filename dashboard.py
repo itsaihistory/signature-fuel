@@ -868,30 +868,34 @@ PIPELINE_ROUTES = {
     },
     "Plantation Pipeline": {
         "color": [22, 163, 74, 180],  # green
-        "description": "Baton Rouge LA to Washington D.C. area — southeastern refined products.",
+        "description": "Baton Rouge LA to Linden NJ — 3,100 mi southeastern refined products pipeline.",
         "capacity": "~660,000 bbl/day",
         "products": "Gasoline, diesel, jet fuel",
         "path": [
             [-91.19, 30.45],   # Baton Rouge LA
-            [-89.97, 30.00],   # Hammond LA
-            [-89.29, 32.30],   # Jackson MS (area)
-            [-88.55, 33.45],   # Tuscaloosa AL (area)
+            [-90.07, 30.21],   # Hammond LA
+            [-89.10, 31.33],   # Collins MS area
+            [-88.55, 33.45],   # Tuscaloosa AL area
             [-86.80, 33.52],   # Birmingham AL
             [-85.68, 33.46],   # Anniston / Oxford AL
-            [-84.56, 33.84],   # Austell GA (junction w/ Colonial)
+            [-84.56, 33.84],   # Bremen GA area
             [-84.39, 33.75],   # Atlanta GA
-            [-83.40, 34.77],   # Gainesville GA
-            [-82.83, 34.68],   # Clemson SC area
-            [-82.55, 35.60],   # Asheville NC
-            [-81.68, 35.91],   # Morganton NC
+            [-83.65, 33.96],   # Athens GA area
+            [-82.63, 34.18],   # Anderson SC area
+            [-82.01, 34.47],   # Greenville SC area
+            [-81.63, 34.85],   # Spartanburg SC area
             [-80.84, 35.23],   # Charlotte NC
             [-80.26, 36.10],   # Winston-Salem NC
             [-79.79, 36.07],   # Greensboro NC
-            [-79.10, 36.50],   # Danville VA
-            [-79.43, 37.27],   # Roanoke VA
-            [-78.87, 37.83],   # Charlottesville VA area
+            [-79.44, 36.09],   # Burlington NC area
+            [-78.64, 35.78],   # Raleigh NC area
+            [-77.94, 36.34],   # South Hill VA area
             [-77.44, 37.54],   # Richmond VA
-            [-77.04, 38.90],   # Washington D.C. area
+            [-77.04, 38.90],   # Northern VA / D.C. area
+            [-76.61, 39.29],   # Baltimore MD area
+            [-75.52, 39.67],   # Wilmington DE area
+            [-74.86, 40.22],   # Trenton NJ area
+            [-74.24, 40.62],   # Linden NJ
         ],
     },
     "Explorer Pipeline": {
