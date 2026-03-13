@@ -875,6 +875,17 @@ PIPELINE_ROUTES = {
             [-117.16, 32.72],  # San Diego (Mission Valley)
         ],
     },
+    "Everglades Pipeline (Buckeye)": {
+        "color": [6, 182, 212, 180],  # teal/cyan
+        "description": "Port Everglades to MIA and FLL — 36-mi subterranean jet fuel (Jet A) pipeline serving Miami and Fort Lauderdale airports.",
+        "capacity": "Dedicated jet fuel line",
+        "products": "Jet A fuel",
+        "path": [
+            [-80.12, 26.09],  # Port Everglades (Broward County)
+            [-80.15, 26.07],  # Fort Lauderdale-Hollywood Intl (FLL)
+            [-80.29, 25.80],  # Miami International Airport (MIA)
+        ],
+    },
     "SFPP — East Line (Kinder Morgan)": {
         "color": [245, 158, 11, 180],  # amber/orange (same color — same system)
         "description": "LA Basin to Phoenix and Tucson AZ — ~400-mi eastern segment originating in El Paso TX corridor.",
