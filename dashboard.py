@@ -407,11 +407,25 @@ def page_market():
             crack_live = live_ho - wti_gal_live
             crack_bbl_live = crack_live * 42
 
-            # Show the math
-            col_1, col_2, col_3 = st.columns(3)
-            col_1.metric("Jet Fuel (proxy)", f"${live_ho:.4f}/gal")
-            col_2.metric("Crude Oil (WTI)", f"${wti_gal_live:.4f}/gal")
-            col_3.metric("Refining Markup", f"${crack_live:.4f}/gal")
+            # Show the math step by step
+            st.markdown(
+                f"<div style='background:#f8fafc;border:1px solid #e2e8f0;"
+                f"border-radius:10px;padding:1.25rem;margin:0.75rem 0'>"
+                f"<span style='color:#64748b;font-size:0.85rem;font-weight:600;"
+                f"text-transform:uppercase;letter-spacing:0.04em'>The Math</span><br>"
+                f"<span style='font-size:1.3rem'>"
+                f"<strong>${live_ho:.4f}</strong>/gal <span style='color:#64748b'>(jet fuel)</span>"
+                f" &nbsp;−&nbsp; "
+                f"<strong>${wti_gal_live:.4f}</strong>/gal <span style='color:#64748b'>(crude oil ÷ 42 gal/bbl)</span>"
+                f" &nbsp;=&nbsp; "
+                f"<strong style='color:#0f172a'>${crack_live:.4f}</strong>/gal markup"
+                f"</span><br>"
+                f"<span style='color:#64748b;font-size:0.9rem'>"
+                f"${crack_live:.4f}/gal × 42 gal/bbl = <strong>${crack_bbl_live:.0f}/bbl</strong>"
+                f" (industry-standard unit)</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
             # Plain-English interpretation
             if crack_bbl_live > 35:
