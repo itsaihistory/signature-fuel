@@ -868,7 +868,7 @@ PIPELINE_ROUTES = {
     },
     "Plantation Pipeline": {
         "color": [22, 163, 74, 180],  # green
-        "description": "Baton Rouge LA to Linden NJ — 3,100 mi southeastern refined products pipeline.",
+        "description": "Baton Rouge LA to D.C. area — 3,100 mi southeastern refined products pipeline with branches to Charlotte and Roanoke.",
         "capacity": "~660,000 bbl/day",
         "products": "Gasoline, diesel, jet fuel",
         "path": [
@@ -881,21 +881,15 @@ PIPELINE_ROUTES = {
             [-84.56, 33.84],   # Bremen GA area
             [-84.39, 33.75],   # Atlanta GA
             [-83.65, 33.96],   # Athens GA area
-            [-82.63, 34.18],   # Anderson SC area
-            [-82.01, 34.47],   # Greenville SC area
-            [-81.63, 34.85],   # Spartanburg SC area
+            [-82.35, 34.85],   # Greenville SC area
+            [-81.05, 35.05],   # Gastonia NC area
             [-80.84, 35.23],   # Charlotte NC
             [-80.26, 36.10],   # Winston-Salem NC
             [-79.79, 36.07],   # Greensboro NC
-            [-79.44, 36.09],   # Burlington NC area
-            [-78.64, 35.78],   # Raleigh NC area
-            [-77.94, 36.34],   # South Hill VA area
+            [-79.43, 37.27],   # Roanoke VA area
+            [-78.87, 37.83],   # Charlottesville VA area
             [-77.44, 37.54],   # Richmond VA
             [-77.04, 38.90],   # Northern VA / D.C. area
-            [-76.61, 39.29],   # Baltimore MD area
-            [-75.52, 39.67],   # Wilmington DE area
-            [-74.86, 40.22],   # Trenton NJ area
-            [-74.24, 40.62],   # Linden NJ
         ],
     },
     "Explorer Pipeline": {
