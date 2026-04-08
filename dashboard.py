@@ -1492,10 +1492,9 @@ def page_shell_map():
                     get_line_color="properties.line_color",
                     get_line_width=2000,
                     line_width_min_pixels=1,
-                    pickable=True,
+                    pickable=False,
                     stroked=True,
                     filled=True,
-                    auto_highlight=True,
                 )
             )
 
