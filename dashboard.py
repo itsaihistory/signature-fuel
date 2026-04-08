@@ -13,7 +13,10 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import requests
+import logging
 import yfinance as yf
+
+logger = logging.getLogger(__name__)
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -21,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config.settings import CACHE_DIR, OUTPUT_DIR
 from src.api.eia_client import EIAClient
 from src.api.news_client import NewsClient
+from src.api.a4a_client import A4AClient
 from src.engines.arbitrage import ArbitrageEngine
 from src.engines.daily_pipeline import DailyPipeline, DEFAULT_MARKETS
 
@@ -199,6 +203,26 @@ def load_news():
     return client.get_energy_headlines(days_back=3, max_results=25)
 
 
+@st.cache_data(ttl=7200)  # 2-hour cache — A4A updates once daily
+def load_a4a_price():
+    """Fetch latest A4A/Argus US Jet Fuel Index (scraped, no key needed)."""
+    client = A4AClient()
+    prices = client.get_prices(use_cache=True)
+    if not prices:
+        return None
+    latest = prices[-1]
+    # Compute day-over-day change
+    prev = prices[-2]["value"] if len(prices) >= 2 else None
+    change = (latest["value"] - prev) if prev else None
+    pct = (change / prev * 100) if prev else None
+    return {
+        "price": latest["value"],
+        "date": latest["date"],
+        "change": change,
+        "pct": pct,
+    }
+
+
 @st.cache_data(ttl=300)  # 5-minute cache — keeps it fresh without hammering Yahoo
 def load_live_prices():
     """Fetch near-real-time futures prices from Yahoo Finance (free, no key)."""
@@ -225,7 +249,25 @@ def load_live_prices():
                 "pct": pct,
             }
         except Exception:
-            pass
+            # Fallback: try fetching 2-day history instead of fast_info
+            try:
+                ticker = yf.Ticker(sym)
+                hist = ticker.history(period="2d")
+                if len(hist) >= 1:
+                    price = float(hist["Close"].iloc[-1])
+                    prev = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else None
+                    change = (price - prev) if prev else None
+                    pct = (change / prev * 100) if prev else None
+                    results[sym] = {
+                        "label": label,
+                        "price": price,
+                        "change": change,
+                        "pct": pct,
+                    }
+                else:
+                    logger.warning("No history data for %s (%s)", sym, label)
+            except Exception as e2:
+                logger.warning("Failed to fetch %s (%s): %s", sym, label, e2)
     return results
 
 
@@ -307,7 +349,8 @@ st.sidebar.caption("Fuel Pricing Intelligence")
 page = st.sidebar.radio(
     "Navigate",
     ["Daily Recommendations", "Market Overview", "Market News",
-     "Inventory & Supply", "Weather Alerts", "FBO & Pipeline Map"],
+     "Inventory & Supply", "Weather Alerts", "FBO & Pipeline Map",
+     "Shell Aviation Map"],
     label_visibility="collapsed",
 )
 
@@ -405,22 +448,49 @@ def page_market():
 
     # ── Live Futures Ticker (Yahoo Finance, ~5 min delay) ───
     live = load_live_prices()
-    if live:
-        st.markdown("### Live Futures")
-        st.caption("Near real-time via Yahoo Finance. Updated every 5 minutes.")
+    a4a = load_a4a_price()
 
-        cols = st.columns(len(live))
-        for i, (sym, d) in enumerate(live.items()):
-            unit = "/gal" if sym in ("HO=F", "RB=F") else "/bbl" if sym in ("CL=F", "BZ=F") else ""
-            fmt = f"${d['price']:.4f}{unit}" if sym in ("HO=F", "RB=F") else f"${d['price']:.2f}{unit}"
+    if live or a4a:
+        st.markdown("### Live Futures")
+        st.caption("Near real-time via Yahoo Finance (5-min delay) + A4A/Argus Jet Fuel Index (daily).")
+
+        # Build display items: A4A jet fuel first, then futures
+        display_items = []
+
+        if a4a:
             delta_str = None
-            if d["change"] is not None:
-                sign = "+" if d["change"] >= 0 else ""
-                if sym in ("HO=F", "RB=F"):
-                    delta_str = f"{sign}{d['change']:.4f} ({sign}{d['pct']:.2f}%)"
-                else:
-                    delta_str = f"{sign}{d['change']:.2f} ({sign}{d['pct']:.2f}%)"
-            cols[i].metric(d["label"], fmt, delta=delta_str)
+            if a4a["change"] is not None:
+                sign = "+" if a4a["change"] >= 0 else ""
+                delta_str = f"{sign}{a4a['change']:.4f} ({sign}{a4a['pct']:.2f}%)"
+            display_items.append(("A4A", {
+                "label": f"Jet Fuel (A4A/Argus) — {a4a['date']}",
+                "price": a4a["price"],
+                "change": a4a["change"],
+                "pct": a4a["pct"],
+                "fmt": f"${a4a['price']:.4f}/gal",
+                "delta_str": delta_str,
+            }))
+
+        if live:
+            display_order = ["CL=F", "BZ=F", "HO=F", "RB=F", "NG=F"]
+            for sym in display_order:
+                if sym not in live:
+                    continue
+                d = live[sym]
+                unit = "/gal" if sym in ("HO=F", "RB=F") else "/bbl" if sym in ("CL=F", "BZ=F") else ""
+                fmt = f"${d['price']:.4f}{unit}" if sym in ("HO=F", "RB=F") else f"${d['price']:.2f}{unit}"
+                delta_str = None
+                if d["change"] is not None:
+                    sign = "+" if d["change"] >= 0 else ""
+                    if sym in ("HO=F", "RB=F"):
+                        delta_str = f"{sign}{d['change']:.4f} ({sign}{d['pct']:.2f}%)"
+                    else:
+                        delta_str = f"{sign}{d['change']:.2f} ({sign}{d['pct']:.2f}%)"
+                display_items.append((sym, {**d, "fmt": fmt, "delta_str": delta_str}))
+
+        cols = st.columns(len(display_items))
+        for i, (sym, d) in enumerate(display_items):
+            cols[i].metric(d["label"], d["fmt"], delta=d.get("delta_str"))
 
         st.markdown("---")
 
@@ -1328,6 +1398,237 @@ def page_news():
                 st.caption(article["description"][:300])
 
 
+# ── Shell Aviation Locations ────────────────────────────────────────────────
+
+SHELL_LOCATIONS = [
+    {"name": "Birmingham, AL — Buckeye", "type": "Jet Rack", "lat": 33.45963906737603, "lon": -86.87241589174307, "padd": 3},
+    {"name": "Bradley Intl (BDL)", "type": "Jet Rack", "lat": 41.92817685915652, "lon": -72.69450463015869, "padd": 1},
+    {"name": "Chesapeake, VA — Kinder Morgan", "type": "Jet Rack", "lat": 36.793380122253126, "lon": -76.28747530335943, "padd": 1},
+    {"name": "Doraville, GA — Buckeye", "type": "Jet Rack", "lat": 33.91763584473982, "lon": -84.26512291879558, "padd": 1},
+    {"name": "Greensboro, NC — CenterPoint", "type": "Jet Rack", "lat": 36.07919266548176, "lon": -79.92520093221901, "padd": 1},
+    {"name": "Kenner, LA — Equilon", "type": "Jet Refinery", "lat": 29.986131193796297, "lon": -90.26628403425413, "padd": 3},
+    {"name": "Knoxville, TN — Kinder Morgan", "type": "Jet Rack", "lat": 35.961003411824755, "lon": -83.99803693222314, "padd": 1},
+    {"name": "New Haven", "type": "Jet Refinery", "lat": 41.28804768451322, "lon": -72.90016624552335, "padd": 1},
+    {"name": "Newark, NJ — EWR", "type": "Jet Rack", "lat": 40.67481885277786, "lon": -74.18685298787729, "padd": 1},
+    {"name": "Newington — Kinder Morgan No. 2", "type": "Jet Rack", "lat": 38.73450968892474, "lon": -77.19151366095966, "padd": 1},
+    {"name": "North Augusta — Kinder Morgan No. 1", "type": "Jet Rack", "lat": 33.594507705343524, "lon": -81.95137731696175, "padd": 1},
+    {"name": "Providence, RI — Shell", "type": "Jet Rack", "lat": 41.80055522598658, "lon": -71.39793746084271, "padd": 1},
+    {"name": "Richmond, VA — Kinder Morgan", "type": "Jet Rack", "lat": 37.460134014588064, "lon": -77.43533903217083, "padd": 1},
+    {"name": "San Jose — Kinder Morgan", "type": "Jet Rack", "lat": 37.36379196344904, "lon": -121.88481428799992, "padd": 5},
+    {"name": "Seattle — Shell Oil", "type": "Jet Refinery", "lat": 47.58070408867667, "lon": -122.35305953360945, "padd": 5},
+    {"name": "Washington, DCA — Allied", "type": "Jet Rack", "lat": 38.84185339964588, "lon": -77.04327010403524, "padd": 1},
+]
+
+PADD_COLORS = {
+    1: {"name": "PADD 1 — East Coast",    "fill": [59, 130, 246, 35],  "line": [59, 130, 246, 160]},
+    2: {"name": "PADD 2 — Midwest",        "fill": [34, 197, 94, 35],  "line": [34, 197, 94, 160]},
+    3: {"name": "PADD 3 — Gulf Coast",     "fill": [239, 68, 68, 35],  "line": [239, 68, 68, 160]},
+    4: {"name": "PADD 4 — Rocky Mountain", "fill": [168, 85, 247, 35], "line": [168, 85, 247, 160]},
+    5: {"name": "PADD 5 — West Coast",     "fill": [245, 158, 11, 35], "line": [245, 158, 11, 160]},
+}
+
+
+def page_shell_map():
+    st.title("Shell Aviation — Jet Fuel Network")
+    st.caption("Shell Aviation jet fuel refineries and truck rack terminals across the U.S.")
+
+    df = pd.DataFrame(SHELL_LOCATIONS)
+
+    # Separate refineries and racks
+    refineries = df[df["type"] == "Jet Refinery"]
+    racks = df[df["type"] == "Jet Rack"]
+
+    # Summary metrics
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Locations", len(df))
+    c2.metric("Jet Refineries", len(refineries))
+    c3.metric("Truck Racks", len(racks))
+
+    # Filters
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        type_filter = st.multiselect(
+            "Location Type", ["Jet Refinery", "Jet Rack"],
+            default=["Jet Refinery", "Jet Rack"],
+        )
+    with col_f2:
+        padd_options = sorted(df["padd"].unique())
+        padd_labels = {p: PADD_COLORS[p]["name"] for p in padd_options}
+        selected_padds = st.multiselect(
+            "PADD Region",
+            padd_options,
+            default=padd_options,
+            format_func=lambda p: padd_labels[p],
+        )
+
+    df_filtered = df[df["type"].isin(type_filter) & df["padd"].isin(selected_padds)]
+
+    # ── Build pydeck layers ─────────────────────────────────
+    layers = []
+
+    # PADD boundary polygons
+    padd_geo_path = Path("data/reference/padd_boundaries.json")
+    if padd_geo_path.exists():
+        padd_geo = json.loads(padd_geo_path.read_text())
+        # Color each feature by its PADD
+        for feature in padd_geo["features"]:
+            padd_num = feature["properties"]["padd"]
+            if padd_num in selected_padds:
+                colors = PADD_COLORS[padd_num]
+                feature["properties"]["fill_color"] = colors["fill"]
+                feature["properties"]["line_color"] = colors["line"]
+
+        visible_features = [
+            f for f in padd_geo["features"]
+            if f["properties"]["padd"] in selected_padds
+        ]
+        if visible_features:
+            padd_visible = {"type": "FeatureCollection", "features": visible_features}
+            layers.append(
+                pdk.Layer(
+                    "GeoJsonLayer",
+                    data=padd_visible,
+                    get_fill_color="properties.fill_color",
+                    get_line_color="properties.line_color",
+                    get_line_width=2000,
+                    line_width_min_pixels=1,
+                    pickable=True,
+                    stroked=True,
+                    filled=True,
+                    auto_highlight=True,
+                )
+            )
+
+    # Add tooltip columns
+    df_map = df_filtered.copy()
+    df_map["tooltip_title"] = df_map["name"]
+    df_map["tooltip_detail"] = df_map["type"] + " | " + df_map["padd"].map(
+        lambda p: PADD_COLORS[p]["name"]
+    )
+
+    # Refinery layer — red diamonds (larger)
+    ref_data = df_map[df_map["type"] == "Jet Refinery"]
+    if len(ref_data) > 0:
+        layers.append(
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=ref_data,
+                get_position=["lon", "lat"],
+                get_fill_color=[220, 38, 38, 230],
+                get_line_color=[255, 255, 255, 255],
+                get_radius=12000,
+                radius_min_pixels=7,
+                radius_max_pixels=14,
+                line_width_min_pixels=2,
+                stroked=True,
+                pickable=True,
+                auto_highlight=True,
+            )
+        )
+
+    # Rack layer — blue dots
+    rack_data = df_map[df_map["type"] == "Jet Rack"]
+    if len(rack_data) > 0:
+        layers.append(
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=rack_data,
+                get_position=["lon", "lat"],
+                get_fill_color=[59, 130, 246, 230],
+                get_line_color=[255, 255, 255, 255],
+                get_radius=8000,
+                radius_min_pixels=5,
+                radius_max_pixels=10,
+                line_width_min_pixels=2,
+                stroked=True,
+                pickable=True,
+                auto_highlight=True,
+            )
+        )
+
+    # View — center on the data
+    view = pdk.ViewState(
+        latitude=37.5,
+        longitude=-90.0,
+        zoom=3.6,
+        pitch=0,
+    )
+
+    tooltip = {
+        "html": "<b>{tooltip_title}</b><br/>{tooltip_detail}",
+        "style": {
+            "backgroundColor": "#0f172a",
+            "color": "#e2e8f0",
+            "fontSize": "13px",
+            "padding": "8px 12px",
+            "borderRadius": "6px",
+        },
+    }
+
+    st.pydeck_chart(
+        pdk.Deck(
+            layers=layers,
+            initial_view_state=view,
+            tooltip=tooltip,
+            map_style="light",
+        ),
+        use_container_width=True,
+        height=560,
+    )
+
+    # ── Legend ─────────────────────────────────────────────
+    st.markdown("### Legend")
+
+    leg1, leg2 = st.columns(2)
+    with leg1:
+        st.markdown("**Location Types**")
+        st.markdown(
+            "<span style='display:inline-block;width:14px;height:14px;"
+            "background:rgb(220,38,38);border-radius:50%;margin-right:8px;"
+            "vertical-align:middle;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.3)'></span>"
+            " Jet Refinery",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<span style='display:inline-block;width:12px;height:12px;"
+            "background:rgb(59,130,246);border-radius:50%;margin-right:8px;"
+            "vertical-align:middle;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.3)'></span>"
+            " Truck Rack",
+            unsafe_allow_html=True,
+        )
+    with leg2:
+        st.markdown("**PADD Regions**")
+        for p in sorted(PADD_COLORS.keys()):
+            info = PADD_COLORS[p]
+            r, g, b, _ = info["line"]
+            st.markdown(
+                f"<span style='display:inline-block;width:14px;height:14px;"
+                f"background:rgba({r},{g},{b},0.25);border:2px solid rgb({r},{g},{b});"
+                f"border-radius:3px;margin-right:8px;vertical-align:middle'></span>"
+                f" {info['name']}",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("---")
+
+    # ── Directory table ─────────────────────────────────────
+    st.markdown("### Shell Aviation Directory")
+    df_display = df_filtered[["name", "type", "padd", "lat", "lon"]].copy()
+    df_display["padd_label"] = df_display["padd"].map(lambda p: PADD_COLORS[p]["name"])
+    st.dataframe(
+        df_display[["name", "type", "padd_label", "lat", "lon"]].sort_values("name"),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "name": st.column_config.TextColumn("Location"),
+            "type": st.column_config.TextColumn("Type"),
+            "padd_label": st.column_config.TextColumn("PADD Region"),
+            "lat": st.column_config.NumberColumn("Latitude", format="%.4f"),
+            "lon": st.column_config.NumberColumn("Longitude", format="%.4f"),
+        },
+    )
+
+
 # ── Router ──────────────────────────────────────────────────────────────────
 
 if page == "Daily Recommendations":
@@ -1342,3 +1643,5 @@ elif page == "Weather Alerts":
     page_weather()
 elif page == "FBO & Pipeline Map":
     page_fbo_map()
+elif page == "Shell Aviation Map":
+    page_shell_map()

@@ -96,12 +96,48 @@ class NewsClient:
                 body = json.loads(resp.read().decode())
 
             articles = self._parse_response(body)
+
+            # Second call: pull from premium wire services that may be
+            # underrepresented in the relevancy-sorted main results
+            wire_articles = self._fetch_wire_services(from_date)
+            if wire_articles:
+                seen_titles = {a["title"].lower() for a in articles}
+                for wa in wire_articles:
+                    if wa["title"].lower() not in seen_titles:
+                        articles.append(wa)
+                        seen_titles.add(wa["title"].lower())
+
             self._save_to_cache("news_energy", articles)
             return articles
 
         except Exception as e:
             logger.error(f"NewsAPI error: {e}")
             return self._load_from_cache("news_energy")
+
+    def _fetch_wire_services(self, from_date: str) -> list[dict]:
+        """Fetch energy headlines specifically from Reuters, AP, Bloomberg."""
+        wire_query = (
+            '\"jet fuel\" OR \"crude oil\" OR OPEC OR refinery OR '
+            '\"oil price\" OR \"fuel supply\" OR pipeline'
+        )
+        params = urlencode({
+            "q": wire_query,
+            "from": from_date,
+            "domains": "reuters.com,apnews.com,bloomberg.com",
+            "language": "en",
+            "sortBy": "publishedAt",
+            "pageSize": "10",
+            "apiKey": self.api_key,
+        })
+        url = f"{BASE_URL}/everything?{params}"
+        try:
+            req = Request(url, headers={"User-Agent": "SignatureFuel/1.0"})
+            with urlopen(req, timeout=15) as resp:
+                body = json.loads(resp.read().decode())
+            return self._parse_response(body)
+        except Exception as e:
+            logger.warning(f"Wire services fetch failed: {e}")
+            return []
 
     def get_topic_headlines(
         self,
@@ -154,10 +190,15 @@ class NewsClient:
 
             source = item.get("source", {}).get("name", "Unknown")
 
+            # Sanitize URL — drop consent/redirect pages that won't work
+            raw_url = item.get("url", "")
+            if "consent.yahoo.com" in raw_url or "collectConsent" in raw_url:
+                raw_url = ""
+
             articles.append({
                 "title": title,
                 "source": source,
-                "url": item.get("url", ""),
+                "url": raw_url,
                 "published": published,
                 "description": item.get("description", "") or "",
                 "topic": self._classify_topic(title, item.get("description", "") or ""),
@@ -180,7 +221,12 @@ class NewsClient:
             "hurricane", "tropical storm", "tornado", "cyclone",
             "flood", "wildfire", "ice storm", "winter storm", "blizzard",
         ]):
-            return "Weather"
+            # Only classify as Weather if also energy/fuel related
+            if any(e in text for e in [
+                "oil", "fuel", "refin", "pipeline", "energy", "gas",
+                "gulf coast", "supply", "outage", "shut", "evacuat",
+            ]):
+                return "Weather"
         if any(w in text for w in ["refinery", "refining", "crack spread", "turnaround"]):
             return "Refinery"
         if any(w in text for w in ["opec", "production cut", "oil output", "opec+"]):
@@ -191,14 +237,27 @@ class NewsClient:
         ]):
             return "Geopolitical"
         if any(w in text for w in [
-            "airline", "air travel", "flight demand", "passenger",
-            "travel season", "tsa throughput",
+            "air travel", "flight demand", "passenger demand",
+            "travel season", "tsa throughput", "airline demand",
+            "airline capacity", "airline earnings", "seat miles",
+        ]):
+            return "Demand"
+        # "airline" alone requires fuel/demand context to avoid cabin crew trivia
+        if "airline" in text and any(w in text for w in [
+            "fuel", "demand", "capacity", "revenue", "traffic",
+            "earnings", "order", "fleet", "route",
         ]):
             return "Demand"
         if any(w in text for w in [
-            "sustainable aviation", "saf", "renewable fuel",
-            "rfs", "carbon credit", "epa", "blending mandate",
+            "sustainable aviation fuel", "renewable fuel",
+            "carbon credit", "blending mandate",
+            "fuel standard", "emissions regulation",
         ]):
+            return "Regulation"
+        # Check abbreviations with word boundaries to avoid false positives
+        # ("saf" in "safety", "epa" in "repeat", "rfs" in unrelated words)
+        import re as _re
+        if _re.search(r'\bsaf\b|\bepa\b|\brfs\b', text):
             return "Regulation"
         if any(w in text for w in [
             "colonial pipeline", "pipeline", "supply disruption",
